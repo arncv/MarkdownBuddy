@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply min-h-screen bg-gray-50;
+  }
+}
+
+.prose pre {
+  @apply bg-gray-800 text-white p-4 rounded-lg overflow-x-auto;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic;
+}
+
+.prose table {
+  @apply border-collapse table-auto w-full;
+}
+
+.prose th {
+  @apply border-b-2 border-gray-200 px-4 py-2 text-left;
+}
+
+.prose td {
+  @apply border-b border-gray-200 px-4 py-2;
+}
+
+.prose code {
+  @apply bg-gray-100 px-1 py-0.5 rounded text-sm;
+}
+
+.prose code::before,
+.prose code::after {
+  content: none;
+}

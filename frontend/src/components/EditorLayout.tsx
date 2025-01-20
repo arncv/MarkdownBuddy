@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useDocument } from '@/contexts/DocumentContext';
 import { MarkdownEditor } from './MarkdownEditor';
 import { MarkdownPreview } from './MarkdownPreview';
+import { ExportButton } from './ExportButton';
 
 interface EditorLayoutProps {
   documentId: string;
@@ -39,7 +40,10 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ documentId }) => {
             </h1>
             <p className="text-blue-100 mt-1">Your collaborative Markdown editor</p>
           </div>
-          <h2 className="text-xl text-blue-100 font-medium">{document.title}</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl text-blue-100 font-medium">{document.title}</h2>
+            <ExportButton documentId={documentId} documentTitle={document.title} />
+          </div>
         </div>
       </header>
 

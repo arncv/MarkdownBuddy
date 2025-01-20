@@ -1,141 +1,166 @@
-# Collaborative Markdown Editor
+# MarkdownBuddy 📝
 
-A real-time collaborative Markdown editor with live preview and presence indicators.
+MarkdownBuddy is a real-time collaborative Markdown editor that allows multiple users to work on documents simultaneously. With a modern interface and powerful features, it makes document collaboration seamless and efficient.
 
-## Features
+## ✨ Features
 
-- Real-time collaborative editing
-- Live Markdown preview
-- User presence indicators
-- Document version history
-- JWT authentication
-- Responsive design
+- **Real-time Collaboration**: Multiple users can edit documents simultaneously
+- **Live Preview**: See your Markdown rendered in real-time
+- **Version Control**: Built-in versioning to prevent conflicts
+- **User Authentication**: Secure user accounts and document access
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Rich Markdown Support**: Full Markdown syntax support with live preview
+- **Document Management**: Create, organize, and share documents easily
 
-## Tech Stack
+## 🚀 Tech Stack
 
-### Frontend
-- React + TypeScript
-- CodeMirror for editor
-- Socket.IO for real-time collaboration
-- TailwindCSS for styling
+- **Frontend**:
+  - React with TypeScript
+  - Tailwind CSS for styling
+  - CodeMirror for the editor
+  - Socket.IO client for real-time updates
+  - Vite for development and building
 
-### Backend
-- Node.js + Express + TypeScript
-- MongoDB + Mongoose
-- Socket.IO for WebSocket communication
-- JWT for authentication
+- **Backend**:
+  - Node.js with Express
+  - TypeScript
+  - Socket.IO for real-time communication
+  - JWT for authentication
 
-## Project Structure
+## 🛠️ Installation
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+- npm or yarn
+- Git
+
+### Setup
+
+1. **Clone the repository**
+```bash
+git clone https://github.com/yourusername/markdownbuddy.git
+cd markdownbuddy
+```
+
+2. **Install dependencies**
+```bash
+# Install root dependencies
+npm install
+
+# Install frontend dependencies
+cd frontend
+npm install
+
+# Install backend dependencies
+cd ../backend
+npm install
+```
+
+3. **Environment Setup**
+
+Create `.env` files in both frontend and backend directories:
+
+Frontend `.env`:
+```env
+VITE_API_URL=http://localhost:3000
+VITE_WS_URL=http://localhost:3000
+```
+
+Backend `.env`:
+```env
+PORT=3000
+JWT_SECRET=your_jwt_secret_here
+```
+
+4. **Start the Development Servers**
+
+In the backend directory:
+```bash
+npm run dev
+```
+
+In the frontend directory:
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:5173`
+
+## 🔧 Development
+
+### Project Structure
 
 ```
-collaborative-markdown-editor/
-├── frontend/           # React frontend
+markdownbuddy/
+├── frontend/                # Frontend React application
 │   ├── src/
-│   │   ├── components/ # React components
-│   │   ├── hooks/     # Custom React hooks
-│   │   ├── services/  # API services
-│   │   ├── contexts/  # React contexts
-│   │   └── types/     # TypeScript types
-└── backend/           # Express backend
-    ├── src/
-    │   ├── controllers/
-    │   ├── services/
-    │   ├── models/
-    │   ├── middleware/
-    │   └── routes/
+│   │   ├── components/     # Reusable React components
+│   │   ├── contexts/       # React context providers
+│   │   ├── pages/         # Page components
+│   │   ├── types/         # TypeScript type definitions
+│   │   └── utils/         # Utility functions
+│   └── ...
+├── backend/                # Backend Node.js server
+│   ├── src/
+│   │   ├── middleware/    # Express middlewares
+│   │   ├── models/        # Data models
+│   │   ├── routes/        # API routes
+│   │   └── utils/         # Utility functions
+│   └── ...
+└── ...
 ```
 
-## Prerequisites
+### Running Tests
 
-- Node.js 18+
-- MongoDB running locally or a MongoDB Atlas connection string
-- npm or yarn package manager
+```bash
+# Run frontend tests
+cd frontend
+npm test
 
-## Setup
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install        # Install root dependencies
-   cd frontend
-   npm install       # Install frontend dependencies
-   cd ../backend
-   npm install       # Install backend dependencies
-   ```
-
-3. Set up environment variables:
-   - Copy `.env.example` to `.env` in both frontend and backend directories
-   - Update the values as needed
-
-4. Start MongoDB:
-   ```bash
-   # Make sure MongoDB is running locally or update MONGODB_URI in backend/.env
-   ```
-
-5. Start the development servers:
-   ```bash
-   # In root directory
-   npm run dev       # Starts both frontend and backend
-   ```
-
-   Or separately:
-   ```bash
-   # Frontend (http://localhost:5173)
-   cd frontend
-   npm run dev
-
-   # Backend (http://localhost:3000)
-   cd backend
-   npm run dev
-   ```
-
-## API Documentation
-
-### Authentication
-
-```
-POST /api/auth/register
-POST /api/auth/login
+# Run backend tests
+cd backend
+npm test
 ```
 
-### Documents
+## 📝 Usage
 
-```
-GET    /api/documents         # List documents
-POST   /api/documents         # Create document
-GET    /api/documents/:id     # Get document
-PATCH  /api/documents/:id     # Update document
-POST   /api/documents/:id/collaborators  # Add collaborator
-```
+1. **Registration/Login**
+   - Create an account or log in to access your documents
 
-## WebSocket Events
+2. **Creating Documents**
+   - Click "New Document" from the dashboard
+   - Enter a title for your document
+   - Start writing in Markdown
 
-```typescript
-// Document updates
-socket.emit('document_update', {
-  documentId: string;
-  patch: PatchOperation[];
-  version: number;
-  userId: string;
-});
+3. **Collaborating**
+   - Share your document ID with collaborators
+   - See real-time updates as others edit
+   - Changes are automatically saved
 
-// Presence updates
-socket.emit('presence_update', {
-  documentId: string;
-  userId: string;
-  cursor: { line: number; ch: number };
-  timestamp: number;
-});
-```
+4. **Markdown Features**
+   - Headers (# H1, ## H2, etc.)
+   - Lists (ordered and unordered)
+   - Code blocks with syntax highlighting
+   - Tables
+   - Links and images
+   - And more!
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
+## 📜 License
 
-This project is licensed under the MIT License - see the LICENSE file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [React](https://reactjs.org/)
+- Styled with [Tailwind CSS](https://tailwindcss.com/)
+- Editor powered by [CodeMirror](https://codemirror.net/)
+- Real-time updates with [Socket.IO](https://socket.io/)

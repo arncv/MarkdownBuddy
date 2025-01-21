@@ -79,41 +79,98 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const socketRef = React.useRef<Socket>();
   const debug = import.meta.env.VITE_ENABLE_DEBUG_LOGGING === 'true';
 
+  const cleanupSocket = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+      socketRef.current = undefined;
+    }
+  }, []);
+
+  const initializeSocket = useCallback((documentId: string) => {
+    cleanupSocket();
+
+    socketRef.current = io(import.meta.env.VITE_WS_URL || 'http://localhost:3000', {
+      query: { documentId },
+      transports: ['websocket'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
+
+    if (debug) {
+      console.log('DocumentContext: WebSocket connection initialized');
+    }
+
+    socketRef.current.on('connect', () => {
+      if (debug) {
+        console.log('DocumentContext: WebSocket connected');
+      }
+      socketRef.current?.emit('join_document', documentId);
+    });
+
+    socketRef.current.on('connect_error', (error) => {
+      console.error('DocumentContext: WebSocket connection error', error);
+    });
+
+    socketRef.current.on('document_update', (data: { content: string, version: number }) => {
+      if (debug) {
+        console.log('DocumentContext: Received update', data);
+      }
+      dispatch({
+        type: 'UPDATE_CONTENT',
+        payload: { content: data.content, isLocal: false }
+      });
+    });
+  }, [cleanupSocket, debug]);
+
   const connect = useCallback(async (documentId: string) => {
     try {
-      const response = await api.get(`/documents/${documentId}`);
-      dispatch({ type: 'SET_DOCUMENT', payload: response.data });
-
       if (debug) {
-        console.log('DocumentContext: Loaded document', response.data);
+        console.log('DocumentContext: Starting connection', {
+          documentId,
+          apiUrl: import.meta.env.VITE_API_URL,
+          wsUrl: import.meta.env.VITE_WS_URL
+        });
       }
 
-      socketRef.current = io(import.meta.env.VITE_WS_URL || 'http://localhost:3000', {
-        query: { documentId }
-      });
+      // Reset any existing state
+      dispatch({ type: 'RESET' });
 
-      socketRef.current.on('document_update', (data: { content: string, version: number }) => {
-        if (debug) {
-          console.log('DocumentContext: Received update', data);
-        }
-        dispatch({
-          type: 'UPDATE_CONTENT',
-          payload: { content: data.content, isLocal: false }
+      // Fetch document data
+      const response = await api.get(`/documents/${documentId}`);
+      
+      if (debug) {
+        console.log('DocumentContext: API Response', {
+          status: response.status,
+          headers: response.headers,
+          data: response.data
         });
-      });
+      }
 
-      socketRef.current.emit('join_document', documentId);
+      if (!response.data) {
+        throw new Error('No document data received from server');
+      }
+
+      // Update document state
+      dispatch({ type: 'SET_DOCUMENT', payload: response.data });
+      
+      if (debug) {
+        console.log('DocumentContext: Document state updated', response.data);
+      }
+
+      // Initialize WebSocket connection
+      initializeSocket(documentId);
+
     } catch (error) {
       console.error('DocumentContext: Failed to connect', error);
+      throw error;
     }
-  }, [debug]);
+  }, [debug, initializeSocket]);
 
   const disconnect = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
+    cleanupSocket();
     dispatch({ type: 'RESET' });
-  }, []);
+  }, [cleanupSocket]);
 
   const updateDocument = useCallback(async (content: string) => {
     if (!state.document) {
@@ -152,7 +209,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         payload: { content: response.data.content, isLocal: false }
       });
 
-      if (socketRef.current) {
+      if (socketRef.current?.connected) {
         socketRef.current.emit('document_update', {
           documentId: state.document.id,
           content,
@@ -168,6 +225,13 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       connect(state.document.id);
     }
   }, [state.document, state.version, state.lastServerUpdate, connect, debug]);
+
+  // Cleanup socket on unmount
+  React.useEffect(() => {
+    return () => {
+      cleanupSocket();
+    };
+  }, [cleanupSocket]);
 
   return (
     <DocumentContext.Provider

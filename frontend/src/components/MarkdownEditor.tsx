@@ -2,37 +2,46 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { useDocument } from '@/contexts/DocumentContext';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
+import { EditorView } from '@codemirror/view';
+
+interface ToolbarButton {
+  label: string;
+  icon: JSX.Element;
+  action: (text: string) => string;
+  shortcut: string;
+}
 
 export const MarkdownEditor: React.FC = () => {
   const { document, updateDocument } = useDocument();
   const [localContent, setLocalContent] = useState(document?.content || '');
   const [updateTimer, setUpdateTimer] = useState<NodeJS.Timeout>();
+  const [view, setView] = useState<EditorView | null>(null);
+  const [isDebouncing, setIsDebouncing] = useState(false);
 
   // Sync local content when document changes from server
   useEffect(() => {
-    if (document?.content !== undefined) {
+    if (document?.content !== undefined && !isDebouncing) {
       setLocalContent(document.content);
     }
-  }, [document?.content]);
+  }, [document?.content, isDebouncing]);
 
   const debouncedUpdate = useCallback((content: string) => {
-    // Clear any pending updates
     if (updateTimer) {
       clearTimeout(updateTimer);
     }
 
-    // Set new timer for server update
+    setIsDebouncing(true);
+
     const timer = setTimeout(() => {
       updateDocument(content);
-    }, 500); // 500ms debounce
+      setIsDebouncing(false);
+    }, 300); // Reduced debounce time for better responsiveness
 
     setUpdateTimer(timer);
   }, [updateDocument]);
 
   const handleChange = useCallback((value: string) => {
-    // Update local state immediately for responsive UI
     setLocalContent(value);
-    // Debounce server update
     debouncedUpdate(value);
   }, [debouncedUpdate]);
 
@@ -44,6 +53,81 @@ export const MarkdownEditor: React.FC = () => {
       }
     };
   }, [updateTimer]);
+
+  const insertText = useCallback((transform: (text: string) => string) => {
+    if (!view) return;
+
+    const selection = view.state.selection.main;
+    const selectedText = view.state.sliceDoc(selection.from, selection.to);
+    const newText = transform(selectedText);
+
+    view.dispatch({
+      changes: {
+        from: selection.from,
+        to: selection.to,
+        insert: newText
+      },
+      selection: { anchor: selection.from + newText.length }
+    });
+
+    // Ensure the inserted text is synced
+    const updatedContent = view.state.doc.toString();
+    setLocalContent(updatedContent);
+    debouncedUpdate(updatedContent);
+  }, [view, debouncedUpdate]);
+
+  const toolbarButtons: ToolbarButton[] = [
+    {
+      label: 'Bold',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12h8a4 4 0 000-8H6v8zm0 0h8a4 4 0 010 8H6v-8z" />
+        </svg>
+      ),
+      action: (text) => `**${text || 'bold text'}**`,
+      shortcut: 'Ctrl+B'
+    },
+    {
+      label: 'Italic',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l-4 16M6 16l8-8M6 8l8 8" />
+        </svg>
+      ),
+      action: (text) => `*${text || 'italic text'}*`,
+      shortcut: 'Ctrl+I'
+    },
+    {
+      label: 'Link',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+        </svg>
+      ),
+      action: (text) => `[${text || 'link text'}](url)`,
+      shortcut: 'Ctrl+K'
+    },
+    {
+      label: 'Code',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l-4 16M6 16l8-8M6 8l8 8" />
+        </svg>
+      ),
+      action: (text) => `\`${text || 'code'}\``,
+      shortcut: 'Ctrl+E'
+    },
+    {
+      label: 'Heading',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+        </svg>
+      ),
+      action: (text) => `# ${text || 'Heading'}`,
+      shortcut: 'Ctrl+H'
+    }
+  ];
 
   const placeholder = `# Start writing in Markdown
 
@@ -57,28 +141,62 @@ Use Markdown syntax to format your text:
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-8 flex-1 relative">
-        <div className="mb-4 pb-2 border-b border-gray-200">
-          <h2 className="text-gray-500 text-sm font-medium">Editor</h2>
-        </div>
+      {/* Toolbar */}
+      <div className="px-4 py-2 border-b border-gray-200 bg-gray-50 flex items-center space-x-2">
+        {toolbarButtons.map((button) => (
+          <button
+            key={button.label}
+            onClick={() => insertText(button.action)}
+            className="p-2 hover:bg-gray-200 rounded-md transition-colors duration-150 group relative"
+            title={`${button.label} (${button.shortcut})`}
+          >
+            {button.icon}
+            <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              {button.shortcut}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Editor */}
+      <div className="flex-1 overflow-auto">
         <CodeMirror
           value={localContent}
-          height="calc(100% - 3rem)"
+          height="100%"
           theme="light"
-          extensions={[markdown()]}
+          extensions={[
+            markdown(),
+            EditorView.lineWrapping,
+            EditorView.theme({
+              "&": {
+                fontSize: "14px",
+                height: "100%"
+              },
+              ".cm-content": {
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                padding: "1rem"
+              },
+              ".cm-line": {
+                lineHeight: "1.6"
+              }
+            })
+          ]}
           onChange={handleChange}
           placeholder={placeholder}
+          onCreateEditor={(view) => setView(view)}
           basicSetup={{
-            lineNumbers: false,
-            foldGutter: false,
+            lineNumbers: true,
+            foldGutter: true,
             dropCursor: true,
             allowMultipleSelections: true,
             indentOnInput: true,
             bracketMatching: true,
             closeBrackets: true,
             autocompletion: true,
+            highlightActiveLine: true,
+            highlightSelectionMatches: true
           }}
-          className="w-full rounded-md border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+          className="h-full focus:outline-none"
         />
       </div>
     </div>

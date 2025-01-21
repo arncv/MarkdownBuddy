@@ -52,12 +52,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Routes
-import authRoutes from './routes/auth.js';
-import documentRoutes from './routes/documents.js';
+// Import routes
+import authRouter from './routes/auth.js';
+import documentsRouter from './routes/documents.js';
 
-app.use('/api/auth', authRoutes);
-app.use('/api/documents', documentRoutes);
+// Apply routes
+app.use('/api/auth', authRouter);
+app.use('/api/documents', documentsRouter);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

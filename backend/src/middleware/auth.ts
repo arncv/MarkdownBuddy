@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-export const auth = async (req: Request, res: Response, next: NextFunction) => {
+const auth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log('Auth middleware: Processing request');
     const header = req.header('Authorization');
@@ -47,3 +47,5 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
     res.status(401).json({ message: 'Please authenticate' });
   }
 };
+
+export default auth;

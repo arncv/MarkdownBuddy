@@ -1,39 +1,49 @@
-import React, { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { useDocument } from '@/contexts/DocumentContext';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { DocumentProvider } from '@/contexts/DocumentContext';
 import { EditorLayout } from '@/components/EditorLayout';
-import { ExportButton } from '@/components/ExportButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const DocumentPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { document, connect, disconnect } = useDocument();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (id) {
-      connect(id);
+    if (!isAuthenticated) {
+      console.log('DocumentPage: User not authenticated, redirecting to login');
+      navigate('/login');
+      return;
     }
-    return () => disconnect();
-  }, [id, connect, disconnect]);
 
-  if (!id || !document) {
+    if (!id) {
+      console.log('DocumentPage: No document ID provided');
+      navigate('/documents');
+      return;
+    }
+
+    setIsLoading(false);
+  }, [id, isAuthenticated, navigate]);
+
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="text-gray-500">Loading document...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="text-gray-500">Checking authentication...</div>
+        </div>
       </div>
     );
   }
 
+  if (!id || !isAuthenticated) {
+    return null; // Will be redirected by useEffect
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="py-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">{document.title}</h1>
-            <ExportButton documentId={document.id} documentTitle={document.title} />
-          </div>
-          <EditorLayout documentId={id} />
-        </div>
-      </div>
-    </div>
+    <DocumentProvider>
+      <EditorLayout documentId={id} />
+    </DocumentProvider>
   );
 };

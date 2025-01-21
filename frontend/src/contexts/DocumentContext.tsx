@@ -6,17 +6,21 @@ import api from '@/utils/api';
 interface DocumentContextType extends DocumentState {
   connect: (documentId: string) => Promise<void>;
   disconnect: () => void;
-  updateDocument: (content: string) => void;
+  updateDocument: (content: string) => Promise<void>;
+  isLoading: boolean;
+  error: string | null;
 }
 
 const DocumentContext = createContext<DocumentContextType | null>(null);
 
-const initialState: DocumentState = {
+const initialState: DocumentState & { isLoading: boolean; error: string | null } = {
   document: null,
   version: 0,
   pendingUpdates: [],
   collaborators: [],
-  lastServerUpdate: 0
+  lastServerUpdate: 0,
+  isLoading: false,
+  error: null
 };
 
 type DocumentAction =
@@ -24,16 +28,19 @@ type DocumentAction =
   | { type: 'UPDATE_CONTENT'; payload: { content: string; isLocal: boolean } }
   | { type: 'SET_VERSION'; payload: number }
   | { type: 'UPDATE_SERVER_TIMESTAMP' }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'RESET' };
 
-function documentReducer(state: DocumentState, action: DocumentAction): DocumentState {
+function documentReducer(state: typeof initialState, action: DocumentAction): typeof initialState {
   switch (action.type) {
     case 'SET_DOCUMENT':
       return {
         ...state,
         document: action.payload,
         version: action.payload.version,
-        lastServerUpdate: Date.now()
+        lastServerUpdate: Date.now(),
+        error: null
       };
     case 'UPDATE_CONTENT':
       if (!state.document) return state;
@@ -47,7 +54,8 @@ function documentReducer(state: DocumentState, action: DocumentAction): Document
           version: newVersion
         },
         version: newVersion,
-        lastServerUpdate: action.payload.isLocal ? state.lastServerUpdate : Date.now()
+        lastServerUpdate: action.payload.isLocal ? state.lastServerUpdate : Date.now(),
+        error: null
       };
     case 'SET_VERSION':
       return {
@@ -58,6 +66,16 @@ function documentReducer(state: DocumentState, action: DocumentAction): Document
       return {
         ...state,
         lastServerUpdate: Date.now()
+      };
+    case 'SET_LOADING':
+      return {
+        ...state,
+        isLoading: action.payload
+      };
+    case 'SET_ERROR':
+      return {
+        ...state,
+        error: action.payload
       };
     case 'RESET':
       return initialState;
@@ -87,44 +105,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  const initializeSocket = useCallback((documentId: string) => {
-    cleanupSocket();
-
-    socketRef.current = io(import.meta.env.VITE_WS_URL || 'http://localhost:3000', {
-      query: { documentId },
-      transports: ['websocket'],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
-    });
-
-    if (debug) {
-      console.log('DocumentContext: WebSocket connection initialized');
-    }
-
-    socketRef.current.on('connect', () => {
-      if (debug) {
-        console.log('DocumentContext: WebSocket connected');
-      }
-      socketRef.current?.emit('join_document', documentId);
-    });
-
-    socketRef.current.on('connect_error', (error) => {
-      console.error('DocumentContext: WebSocket connection error', error);
-    });
-
-    socketRef.current.on('document_update', (data: { content: string, version: number }) => {
-      if (debug) {
-        console.log('DocumentContext: Received update', data);
-      }
-      dispatch({
-        type: 'UPDATE_CONTENT',
-        payload: { content: data.content, isLocal: false }
-      });
-    });
-  }, [cleanupSocket, debug]);
-
   const connect = useCallback(async (documentId: string) => {
     try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
       if (debug) {
         console.log('DocumentContext: Starting connection', {
           documentId,
@@ -133,7 +118,8 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
 
-      // Reset any existing state
+      // Reset any existing state and connections
+      cleanupSocket();
       dispatch({ type: 'RESET' });
 
       // Fetch document data
@@ -142,7 +128,6 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (debug) {
         console.log('DocumentContext: API Response', {
           status: response.status,
-          headers: response.headers,
           data: response.data
         });
       }
@@ -153,19 +138,46 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       // Update document state
       dispatch({ type: 'SET_DOCUMENT', payload: response.data });
-      
-      if (debug) {
-        console.log('DocumentContext: Document state updated', response.data);
-      }
 
       // Initialize WebSocket connection
-      initializeSocket(documentId);
+      socketRef.current = io(import.meta.env.VITE_WS_URL || 'http://localhost:3000', {
+        query: { documentId },
+        transports: ['websocket'],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
+      });
 
+      socketRef.current.on('connect', () => {
+        if (debug) {
+          console.log('DocumentContext: WebSocket connected');
+        }
+        socketRef.current?.emit('join_document', documentId);
+      });
+
+      socketRef.current.on('connect_error', (error) => {
+        console.error('DocumentContext: WebSocket connection error', error);
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to connect to server' });
+      });
+
+      socketRef.current.on('document_update', (data: { content: string; version: number }) => {
+        if (debug) {
+          console.log('DocumentContext: Received update', data);
+        }
+        dispatch({
+          type: 'UPDATE_CONTENT',
+          payload: { content: data.content, isLocal: false }
+        });
+      });
     } catch (error) {
       console.error('DocumentContext: Failed to connect', error);
-      throw error;
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: error instanceof Error ? error.message : 'Failed to load document' 
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [debug, initializeSocket]);
+  }, [cleanupSocket, debug]);
 
   const disconnect = useCallback(() => {
     cleanupSocket();
@@ -178,22 +190,22 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
 
-    // Update local state immediately
-    dispatch({
-      type: 'UPDATE_CONTENT',
-      payload: { content, isLocal: true }
-    });
-
-    // Don't send updates too frequently
-    const timeSinceLastUpdate = Date.now() - state.lastServerUpdate;
-    if (timeSinceLastUpdate < 500) {
-      if (debug) {
-        console.log('DocumentContext: Skipping server update, too soon');
-      }
-      return;
-    }
-
     try {
+      // Update local state immediately
+      dispatch({
+        type: 'UPDATE_CONTENT',
+        payload: { content, isLocal: true }
+      });
+
+      // Don't send updates too frequently
+      const timeSinceLastUpdate = Date.now() - state.lastServerUpdate;
+      if (timeSinceLastUpdate < 500) {
+        if (debug) {
+          console.log('DocumentContext: Skipping server update, too soon');
+        }
+        return;
+      }
+
       const response = await api.patch(`/documents/${state.document.id}`, {
         content,
         version: state.version
@@ -209,6 +221,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         payload: { content: response.data.content, isLocal: false }
       });
 
+      // Emit update to other clients
       if (socketRef.current?.connected) {
         socketRef.current.emit('document_update', {
           documentId: state.document.id,
@@ -217,12 +230,14 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
     } catch (error) {
-      if (debug) {
-        console.error('DocumentContext: Update failed', error);
-      }
+      console.error('DocumentContext: Update failed', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update document';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
       
       // Refresh document to get latest version
-      connect(state.document.id);
+      if (state.document) {
+        connect(state.document.id);
+      }
     }
   }, [state.document, state.version, state.lastServerUpdate, connect, debug]);
 

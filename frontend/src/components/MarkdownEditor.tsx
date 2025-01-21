@@ -12,47 +12,27 @@ interface ToolbarButton {
 }
 
 export const MarkdownEditor: React.FC = () => {
-  const { document, updateDocument } = useDocument();
+  const { document, updateDocument, isLoading, error } = useDocument();
   const [localContent, setLocalContent] = useState(document?.content || '');
-  const [updateTimer, setUpdateTimer] = useState<NodeJS.Timeout>();
   const [view, setView] = useState<EditorView | null>(null);
-  const [isDebouncing, setIsDebouncing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Sync local content when document changes from server
   useEffect(() => {
-    if (document?.content !== undefined && !isDebouncing) {
+    if (document?.content !== undefined && !isSaving) {
       setLocalContent(document.content);
     }
-  }, [document?.content, isDebouncing]);
+  }, [document?.content, isSaving]);
 
-  const debouncedUpdate = useCallback((content: string) => {
-    if (updateTimer) {
-      clearTimeout(updateTimer);
-    }
-
-    setIsDebouncing(true);
-
-    const timer = setTimeout(() => {
-      updateDocument(content);
-      setIsDebouncing(false);
-    }, 300); // Reduced debounce time for better responsiveness
-
-    setUpdateTimer(timer);
-  }, [updateDocument]);
-
-  const handleChange = useCallback((value: string) => {
+  const handleChange = useCallback(async (value: string) => {
     setLocalContent(value);
-    debouncedUpdate(value);
-  }, [debouncedUpdate]);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (updateTimer) {
-        clearTimeout(updateTimer);
-      }
-    };
-  }, [updateTimer]);
+    try {
+      setIsSaving(true);
+      await updateDocument(value);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [updateDocument]);
 
   const insertText = useCallback((transform: (text: string) => string) => {
     if (!view) return;
@@ -72,9 +52,8 @@ export const MarkdownEditor: React.FC = () => {
 
     // Ensure the inserted text is synced
     const updatedContent = view.state.doc.toString();
-    setLocalContent(updatedContent);
-    debouncedUpdate(updatedContent);
-  }, [view, debouncedUpdate]);
+    handleChange(updatedContent);
+  }, [view, handleChange]);
 
   const toolbarButtons: ToolbarButton[] = [
     {
@@ -140,14 +119,27 @@ Use Markdown syntax to format your text:
 - Use \`\`\` for code blocks`;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
+      {/* Status Bar */}
+      {(isLoading || isSaving || error) && (
+        <div className={`absolute top-0 left-0 right-0 z-10 px-4 py-2 text-sm ${
+          error ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
+        }`}>
+          {error ? error : (isLoading ? 'Loading...' : 'Saving...')}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="px-4 py-2 border-b border-gray-200 bg-gray-50 flex items-center space-x-2">
         {toolbarButtons.map((button) => (
           <button
             key={button.label}
             onClick={() => insertText(button.action)}
-            className="p-2 hover:bg-gray-200 rounded-md transition-colors duration-150 group relative"
+            className={`
+              p-2 rounded-md transition-colors duration-150 group relative
+              ${isLoading || isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200'}
+            `}
+            disabled={isLoading || isSaving}
             title={`${button.label} (${button.shortcut})`}
           >
             {button.icon}

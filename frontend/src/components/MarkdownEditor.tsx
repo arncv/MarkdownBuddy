@@ -1,8 +1,21 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useDocument } from '@/contexts/DocumentContext';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { EditorView } from '@codemirror/view';
+
+// Debounce function
+const debounce = (func: Function, wait: number) => {
+  let timeout: NodeJS.Timeout;
+  return function executedFunction(...args: any[]) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
 
 interface ToolbarButton {
   label: string;
@@ -24,15 +37,22 @@ export const MarkdownEditor: React.FC = () => {
     }
   }, [document?.content, isSaving]);
 
-  const handleChange = useCallback(async (value: string) => {
+  const debouncedSave = useCallback(
+    debounce(async (value: string) => {
+      try {
+        setIsSaving(true);
+        await updateDocument(value);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1000), // Save after 1 second of no typing
+    [updateDocument]
+  );
+
+  const handleChange = useCallback((value: string) => {
     setLocalContent(value);
-    try {
-      setIsSaving(true);
-      await updateDocument(value);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [updateDocument]);
+    debouncedSave(value);
+  }, [debouncedSave]);
 
   const insertText = useCallback((transform: (text: string) => string) => {
     if (!view) return;
@@ -50,9 +70,10 @@ export const MarkdownEditor: React.FC = () => {
       selection: { anchor: selection.from + newText.length }
     });
 
-    // Ensure the inserted text is synced
+    // Update content locally and trigger debounced save
     const updatedContent = view.state.doc.toString();
-    handleChange(updatedContent);
+    setLocalContent(updatedContent);
+    debouncedSave(updatedContent);
   }, [view, handleChange]);
 
   const toolbarButtons: ToolbarButton[] = [

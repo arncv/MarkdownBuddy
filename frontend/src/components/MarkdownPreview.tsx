@@ -66,24 +66,24 @@ $$
 
   const markdownClass = `
     prose prose-lg max-w-none dark:prose-invert
-    prose-headings:font-semibold 
+    prose-headings:font-semibold prose-headings:text-gray-900
     prose-h1:text-3xl prose-h1:mb-8
     prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4
     prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-3
-    prose-p:text-gray-600 prose-p:leading-relaxed
+    prose-p:text-gray-800 prose-p:leading-relaxed
     prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-    prose-blockquote:border-l-4 prose-blockquote:border-blue-500 
+    prose-blockquote:border-l-4 prose-blockquote:border-blue-500
     prose-blockquote:pl-4 prose-blockquote:italic
     prose-blockquote:text-gray-700 prose-blockquote:font-normal
     prose-code:text-blue-600
     prose-pre:p-0 prose-pre:bg-transparent
     prose-img:rounded-lg prose-img:shadow-md
     prose-table:border-collapse prose-table:w-full
-    prose-th:border prose-th:border-gray-200 prose-th:p-3 prose-th:bg-gray-50
-    prose-td:border prose-td:border-gray-200 prose-td:p-3
+    prose-th:border prose-th:border-gray-200 prose-th:p-3 prose-th:bg-gray-50 prose-th:text-gray-800
+    prose-td:border prose-td:border-gray-200 prose-td:p-3 prose-td:text-gray-800
     prose-ul:list-disc prose-ul:pl-6
     prose-ol:list-decimal prose-ol:pl-6
-    prose-li:my-1
+    prose-li:my-1 prose-li:text-gray-800
     transition-opacity duration-200
   `;
 
